@@ -8,35 +8,35 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await fetch('https://martiangames.com/api/users', {
+    const response = await fetch('https://martiangames.com/api/players', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+
+        // Required headers
         'Origin': 'https://martiangames.com',
-        'Referer': 'https://martiangames.com/portal/game/leaderboard',
-        'Authorization': 'Bearer d58566b4-d72c-44ef-a931-d9fa9c899106'
+        'Referer': 'https://martiangames.com/portal/game/lookup',
+
+        // 🔥 Use fresh token (this one may expire!)
+        'Authorization': 'Bearer 7d8de215-66d0-46f6-8e1c-98242026b97c'
       },
-      body: 'page=1&limit=10000'
+
+      // Adjust if needed (depends on API behavior)
+      body: 'page=1&limit=1000'
     });
 
     const text = await response.text();
 
-    // 🔍 DEBUG: log first part of response
-    console.log('RAW RESPONSE:', text.slice(0, 300));
-
     let data;
-
     try {
       data = JSON.parse(text);
     } catch (e) {
-      // ❌ Instead of crashing, return the raw response
       return res.status(500).json({
         error: 'Invalid API response',
         preview: text.slice(0, 200)
       });
     }
 
-    // 🔥 Ensure it's an array
     if (!Array.isArray(data)) {
       return res.status(500).json({
         error: 'Unexpected API format',
@@ -44,19 +44,19 @@ export default async function handler(req, res) {
       });
     }
 
-    // 🔥 FILTER: last 30 days
+    // 🔥 FILTER: last 30 days only
     const now = new Date();
     const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const filtered = data.filter(user => {
-      const u = user.current || {};
+      const lastLogin = user.current?.lastLogin;
 
-      if (!u.lastLogin) return false;
+      if (!lastLogin) return false;
 
-      const lastLoginDate = new Date(u.lastLogin);
-      if (isNaN(lastLoginDate.getTime())) return false;
+      const date = new Date(lastLogin);
+      if (isNaN(date.getTime())) return false;
 
-      return lastLoginDate >= cutoff;
+      return date >= cutoff;
     });
 
     console.log(`Original: ${data.length}, Active (30d): ${filtered.length}`);

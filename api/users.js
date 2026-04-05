@@ -21,16 +21,30 @@ export default async function handler(req, res) {
 
     const text = await response.text();
 
-    // 🔥 Parse safely
+    // 🔍 DEBUG: log first part of response
+    console.log('RAW RESPONSE:', text.slice(0, 300));
+
     let data;
+
     try {
       data = JSON.parse(text);
     } catch (e) {
-      console.error('Invalid JSON:', text.slice(0, 200));
-      return res.status(500).json({ error: 'Invalid API response' });
+      // ❌ Instead of crashing, return the raw response
+      return res.status(500).json({
+        error: 'Invalid API response',
+        preview: text.slice(0, 200)
+      });
     }
 
-    // 🔥 FILTER: only players active in last 30 days
+    // 🔥 Ensure it's an array
+    if (!Array.isArray(data)) {
+      return res.status(500).json({
+        error: 'Unexpected API format',
+        preview: data
+      });
+    }
+
+    // 🔥 FILTER: last 30 days
     const now = new Date();
     const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -40,17 +54,13 @@ export default async function handler(req, res) {
       if (!u.lastLogin) return false;
 
       const lastLoginDate = new Date(u.lastLogin);
-
-      // Remove invalid dates
       if (isNaN(lastLoginDate.getTime())) return false;
 
       return lastLoginDate >= cutoff;
     });
 
-    // Optional debug
     console.log(`Original: ${data.length}, Active (30d): ${filtered.length}`);
 
-    // ✅ Return filtered data
     res.status(200).json(filtered);
 
   } catch (error) {
